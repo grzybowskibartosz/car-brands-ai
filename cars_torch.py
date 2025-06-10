@@ -1,4 +1,14 @@
 # ✅ Install necessary packages (if not already in Colab)
+# pip install torch torchvision tqdm scikit-learn matplotlib seaborn pillow
+
+"""
+Enhanced Car Recognition Neural Network
+- Handles pre-sized 224x224 training images
+- Includes augmentation to simulate real-world resizing
+- Windows-compatible (handles multiprocessing issues)
+- Multiple model architectures supported
+- Test-time augmentation for robust predictions
+"""
 
 import os
 import numpy as np
@@ -9,6 +19,8 @@ from sklearn.metrics import confusion_matrix
 from collections import Counter
 import matplotlib.pyplot as plt
 import seaborn as sns
+import platform
+import multiprocessing
 
 import torch
 import torch.nn as nn
@@ -28,6 +40,10 @@ FINE_EPOCHS = 30  # Increased from 10
 DROPOUT_RATE = 0.5
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# Set num_workers based on OS
+# Windows has issues with multiprocessing in DataLoader, so we set it to 0
+NUM_WORKERS = 0 if platform.system() == 'Windows' else 2
+
 # 📁 Step 1: Collect image paths and labels
 def collect_image_paths(data_dir):
     image_paths = []
@@ -44,6 +60,12 @@ def collect_image_paths(data_dir):
                     image_paths.append(os.path.join(class_path, fname))
                     labels.append(idx)
     return np.array(image_paths), np.array(labels), class_to_idx, idx_to_class
+
+# Custom transform class to replace lambda (for Windows compatibility)
+class IdentityTransform:
+    """Identity transform that returns input unchanged"""
+    def __call__(self, x):
+        return x
 
 # 🧪 Step 2: Custom Dataset class
 class CustomImageDataset(Dataset):
@@ -115,7 +137,7 @@ def prepare_dataloaders(data_dir):
                 transforms.Pad(padding=10, fill=0, padding_mode='constant'),
                 transforms.Pad(padding=(20, 10), fill=0, padding_mode='constant'),
                 transforms.Pad(padding=(10, 20), fill=0, padding_mode='constant'),
-                transforms.Lambda(lambda x: x),  # No padding
+                IdentityTransform(),  # No padding - replaced lambda
             ]),
             transforms.CenterCrop(IMG_SIZE),  # Crop back to size
             transforms.RandomHorizontalFlip(p=0.5),
@@ -145,9 +167,9 @@ def prepare_dataloaders(data_dir):
     val_ds = CustomImageDataset(val_paths, val_labels, transform=data_transforms['val'])
     test_ds = CustomImageDataset(test_paths, test_labels, transform=data_transforms['test'])
 
-    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=2)
-    val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=2)
-    test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=2)
+    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+    val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
+    test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
     return train_loader, val_loader, test_loader, len(class_to_idx), class_weights, idx_to_class
 
@@ -541,6 +563,7 @@ if __name__ == "__main__":
     print("\n--- Generating Confusion Matrix ---")
     plot_confusion_matrix(model, test_loader, idx_to_class)
 
+    # 💾 Save final model
     torch.save(model.state_dict(), 'final_car_classifier.pth')
     print("\nModel saved as 'final_car_classifier.pth'")
 
@@ -588,3 +611,8 @@ idx_to_class = checkpoint['idx_to_class']
 5. Use predict_with_tta() for production - it's much more robust
 6. Monitor prediction uncertainty - high std indicates low confidence
 """)
+
+# Ensure proper execution on Windows with multiprocessing
+if __name__ == "__main__":
+    multiprocessing.freeze_support()  # Required for Windows executable
+    main()
