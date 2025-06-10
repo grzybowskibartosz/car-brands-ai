@@ -544,50 +544,54 @@ if __name__ == "__main__":
 
     # Create model with dropout
     model = create_model(num_classes, dropout_rate=DROPOUT_RATE)
+    
 
-    # 🧠 Train head only with early stopping
-    print("\n--- Phase 1: Training classifier head ---")
-    model = train_model(model, train_loader, val_loader, INIT_EPOCHS, INIT_LR, 
-                       class_weights, unfreeze=False, patience=5)
+    # # 🧠 Train head only with early stopping
+    # print("\n--- Phase 1: Training classifier head ---")
+    # model = train_model(model, train_loader, val_loader, INIT_EPOCHS, INIT_LR, 
+    #                    class_weights, unfreeze=False, patience=5)
 
-    # 🔓 Fine-tune full model with early stopping
-    print("\n--- Phase 2: Fine-tuning entire model ---")
-    model = train_model(model, train_loader, val_loader, FINE_EPOCHS, FINE_LR, 
-                       class_weights, unfreeze=True, patience=7)
+    # # 🔓 Fine-tune full model with early stopping
+    # print("\n--- Phase 2: Fine-tuning entire model ---")
+    # model = train_model(model, train_loader, val_loader, FINE_EPOCHS, FINE_LR, 
+    #                    class_weights, unfreeze=True, patience=7)
 
-    # 🧪 Evaluate on test set
-    print("\n--- Final Evaluation ---")
-    test_accuracy = evaluate_model(model, test_loader)
+    # # 🧪 Evaluate on test set
+    # print("\n--- Final Evaluation ---")
+    # test_accuracy = evaluate_model(model, test_loader)
 
-    # 📊 Generate confusion matrix
-    print("\n--- Generating Confusion Matrix ---")
-    plot_confusion_matrix(model, test_loader, idx_to_class)
+    # # 📊 Generate confusion matrix
+    # print("\n--- Generating Confusion Matrix ---")
+    # plot_confusion_matrix(model, test_loader, idx_to_class)
 
-    # 💾 Save final model
-    torch.save(model.state_dict(), 'final_car_classifier.pth')
-    print("\nModel saved as 'final_car_classifier.pth'")
+    # # 💾 Save final model
+    # torch.save(model.state_dict(), 'final_car_classifier.pth')
+    # print("\nModel saved as 'final_car_classifier.pth'")
 
-    # 🔍 Example: How to use for custom image prediction
-    print("\n--- Custom Image Prediction Example ---")
-    print("\nIMPORTANT: Since training images are pre-sized to 224x224,")
-    print("the model may struggle with real-world images of different sizes.")
-    print("Use the enhanced prediction functions for better results:")
-    print("\n1. predict_custom_image() - tries multiple preprocessing strategies")
-    print("2. predict_with_tta() - uses test-time augmentation for robustness")
+    # # 🔍 Example: How to use for custom image prediction
+    # print("\n--- Custom Image Prediction Example ---")
+    # print("\nIMPORTANT: Since training images are pre-sized to 224x224,")
+    # print("the model may struggle with real-world images of different sizes.")
+    # print("Use the enhanced prediction functions for better results:")
+    # print("\n1. predict_custom_image() - tries multiple preprocessing strategies")
+    # print("2. predict_with_tta() - uses test-time augmentation for robustness")
     
     # Uncomment and modify the path below to test on your custom image
-    # custom_image_path = "path/to/your/custom/car/image.jpg"
-    # 
-    # # Multi-strategy prediction (recommended for images of different sizes)
-    # predicted_class, _ = predict_custom_image(model, custom_image_path, idx_to_class)
-    # 
-    # # Enhanced TTA prediction (most robust)
-    # tta_predicted_class, _ = predict_with_tta(model, custom_image_path, idx_to_class, n_augmentations=15)
-    # 
-    # # For best results with custom images:
-    # # 1. Try both prediction methods
-    # # 2. If predictions differ significantly, the image might be out-of-distribution
-    # # 3. High uncertainty (std) in TTA indicates the model is unsure
+    state_dict = torch.load("final_car_classifier.pth", map_location=DEVICE)
+    model.load_state_dict(state_dict)
+    model.to(DEVICE).eval()
+    custom_image_path = "mercedes-class-a.jpg"
+    
+    # Multi-strategy prediction (recommended for images of different sizes)
+    predicted_class, _ = predict_custom_image(model, custom_image_path, idx_to_class)
+    
+    # Enhanced TTA prediction (most robust)
+    tta_predicted_class, _ = predict_with_tta(model, custom_image_path, idx_to_class, n_augmentations=15)
+    
+    # For best results with custom images:
+    # 1. Try both prediction methods
+    # 2. If predictions differ significantly, the image might be out-of-distribution
+    # 3. High uncertainty (std) in TTA indicates the model is unsure
     
     print("\n--- How to Load and Use Saved Model ---")
     print("""
@@ -613,6 +617,6 @@ idx_to_class = checkpoint['idx_to_class']
 """)
 
 # Ensure proper execution on Windows with multiprocessing
-if __name__ == "__main__":
-    multiprocessing.freeze_support()  # Required for Windows executable
-    main()
+# if __name__ == "__main__":
+#     multiprocessing.freeze_support()  # Required for Windows executable
+#     main()
