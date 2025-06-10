@@ -48,15 +48,42 @@ def load_model_resources():
     DATA_DIR = './dataset/DATA'
     if not Path(DATA_DIR).is_dir():
         return None, None, None
+
+    # Ustal liczbę klas na podstawie folderów z danymi
     num_classes = len([d for d in Path(DATA_DIR).iterdir() if d.is_dir()])
-    model = models.mobilenet_v2(weights=None)
-    model.classifier[1] = nn.Linear(model.last_channel, num_classes)
-    model_path = "cars_brands.pth"
+
+    # Krok 1: Stwórz bazowy model MobileNetV2
+    model = models.mobilenet_v2(weights=None)  # 'weights=None' to nowa składnia dla pretrained=False
+
+    # Krok 2: ZASTĄP klasyfikator IDENTYCZNYM jak w skrypcie treningowym
+    # To jest kluczowa poprawka!
+    dropout_rate = 0.5  # Użyj tej samej wartości co w pliku cars_torch.py
+    model.classifier = nn.Sequential(
+        nn.Dropout(p=dropout_rate),
+        nn.Linear(model.last_channel, 512),
+        nn.ReLU(),
+        nn.BatchNorm1d(512),
+        nn.Dropout(p=dropout_rate),
+        nn.Linear(512, num_classes)
+    )
+
+    # Krok 3: Załaduj zapisane wagi
+    model_path = "final_car_classifier.pth"
     if not Path(model_path).exists():
+        st.error(f"Nie znaleziono pliku modelu: {model_path}")
         return None, None, None
-    state_dict = torch.load(model_path, map_location=DEVICE)
-    model.load_state_dict(state_dict)
+
+    try:
+        state_dict = torch.load(model_path, map_location=DEVICE)
+        model.load_state_dict(state_dict)
+    except RuntimeError as e:
+        st.error(
+            f"Błąd podczas ładowania wag modelu: Architektura w app.py nie zgadza się z zapisanym modelem. Szczegóły: {e}")
+        return None, None, None
+
     model.to(DEVICE).eval()
+
+    # Załaduj etykiety
     id2label = sorted([d.name for d in Path(DATA_DIR).iterdir() if d.is_dir()])
     print("Model and resources loaded successfully.")
     return model, id2label, DEVICE
